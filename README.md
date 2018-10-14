@@ -15,12 +15,12 @@ Ao ser iniciado, cada nó contata um conjunto de nós iniciais (seeds), requisit
 
 Requisição
 ```
-<tamanho>|DSCVR
+DSCVR
 ```
 
 Resposta
 ```
-<tamanho>|DSCVR|<ultimo_comando>|<node_1>[,node2]
+DSCVR|<ultimo_comando>|<node_1>[,node2]
 ```
 
 ### Ping
@@ -28,22 +28,37 @@ Periodicamente, cada nó verifica se seus vizinhos ainda estão disponíveis.
 
 Requisição
 ```
-<tamanho>|PING
+PING
 ```
 
 Resposta
 ```
-<tamanho>|PONG
+PONG
 ```
 
 ### Propagação de comandos
 
 Requisição
 ```
-<tamanho>|CMD|<comando>|<host>|<porta>|<assinatura>
+CMD|<comando>|<host>|<porta>|<assinatura>
 ```
 Comando: SLOWLORIS
 Assinatura: Assinatura RSA do payload.
 
 O nó que recebe essa requisição verifica a assinatura usando a chave pública estabelecida em sua configuração. Caso a assinatura seja válida, o nó passa a executar a instrução recebida, repassando a mensagem para todos os seus vizinhos.
 
+### Mapeamento de rede
+
+Requisição (I)
+```
+REPORT|<destino>|report_id
+```
+
+Resulta em uma requisição para o nó de destino, passando sua lista de peers: (II)
+```
+REPORT|<destino>|report_id|<node_1>[,node2]
+```
+
+E em uma requisição (I) para cada um de seus peers
+
+O nó que recebe essa requisição verifica a assinatura usando a chave pública estabelecida em sua configuração. Caso a assinatura seja válida, o nó passa a executar a instrução recebida, repassando a mensagem para todos os seus vizinhos.
