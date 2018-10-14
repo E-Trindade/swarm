@@ -13,7 +13,13 @@ INPUT_EXIT   = 'exit'
 
 def do_report(addr):
     report = send_init_report_listener(addr)
-    print(report)
+    report = report.replace(' ', '\n')
+    lines = report.split('\n')
+    for line in lines:
+        ip, port, peers = line.split('|')
+        print(f'{ip}:{port} ->')
+        for peer in peers.split(','):
+            print(f'\t{peer}')
 
 def do_attack(addr):
     pass
