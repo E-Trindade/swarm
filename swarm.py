@@ -89,7 +89,7 @@ def send_init_report_listener(addr):
 def answer_init_report_listener(callback_socket, callback_addr, my_address, report_id):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.settimeout(5)
-        sock.bind((my_address[0], 9999))
+        sock.bind(('', 9999))
         for peer in global_peer_list:
             s_print('[REPORT] initial repassing REPORT to ', peer)
             send_message(sock,
@@ -135,7 +135,8 @@ def listen_thread(my_address, write_queue):
     s_print('Started listen_thread', flush=True)
 
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_socket.bind(my_address)
+    host, port = my_address
+    udp_socket.bind(('', port))
 
     global global_peer_list
 
@@ -163,16 +164,17 @@ def listen_thread(my_address, write_queue):
         except Exception as e:
             raise e
 
-def boot_server(host='127.0.0.1', port=2048):
+def boot_server(host='', port=2000):
 
     SEEDS = [
-        ('127.0.0.1', 1998),
-        ('127.0.0.1', 1999),
+        ('192.168.1.129', 1998),
+        ('192.168.1.129', 1999),
         ('192.168.1.129', 2000)
     ]
 
     listenthread_read_queue = queue.Queue()
 
+    host = '192.168.1.129'
     t = threading.Thread(target=listen_thread, args=((host, port), listenthread_read_queue))
     t.setDaemon(True)
     t.start()
