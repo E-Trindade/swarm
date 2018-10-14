@@ -83,7 +83,7 @@ def send_init_report_listener(addr):
     report_id = str(random.randint(10000, 99999))
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         send_message(sock, addr, report_id, METHOD_INIT_REPORT)
-        response = listen_to_message(sock)
+        response, _ = listen_to_message(sock)
         return response
 
 def answer_init_report_listener(callback_socket, callback_addr, my_address, report_id):
@@ -168,7 +168,7 @@ def boot_server(host='127.0.0.1', port=2048):
     SEEDS = [
         ('127.0.0.1', 1998),
         ('127.0.0.1', 1999),
-        ('127.0.0.1', 2000)
+        ('192.168.1.129', 2000)
     ]
 
     listenthread_read_queue = queue.Queue()
