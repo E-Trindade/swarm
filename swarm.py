@@ -244,6 +244,13 @@ def verify_seeds(SEEDS,global_peer_list,current_command,host, port):
 
 if __name__ == '__main__':
     port=int(sys.argv[1])
+
+    
+    if len(sys.argv) > 2:
+        additional_seed = sys.argv[2].split(':')
+        additional_seed = (additional_seed[0], int(additional_seed[1]))
+        INIT_SEEDS.append(additional_seed)
+
     ip = get_ip()
     print('Initialize hosname: ', socket.gethostname(),' at address:',ip,':',port,'on:',datetime.datetime.now())
     boot_server(ip,port)
