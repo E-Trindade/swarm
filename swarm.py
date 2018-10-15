@@ -186,7 +186,6 @@ def boot_server(host='', port=2000):
 
     listenthread_read_queue = queue.Queue()
 
-    host = '192.168.1.129'
     t = threading.Thread(target=listen_thread, args=((host, port), listenthread_read_queue))
     t.setDaemon(True)
     t.start()
@@ -197,7 +196,7 @@ def boot_server(host='', port=2000):
     global current_command
     current_command = COMMAND_NOOP
 
-    verify_seeds(SEEDS,global_peer_list,current_command,host, port)
+    verify_seeds(SEEDS, global_peer_list, current_command, get_ip(), port)
 
     while True:
         for peer in global_peer_list:
@@ -219,9 +218,9 @@ def boot_server(host='', port=2000):
         if not global_peer_list:
             time.sleep(5)
             print("re-initialize")
-            verify_seeds(SEEDS,global_peer_list,current_command,host, port)
+            verify_seeds(SEEDS, global_peer_list, current_command, get_ip(), port)
 
-def verify_seeds(SEEDS,global_peer_list,current_command,host, port):
+def verify_seeds(SEEDS, global_peer_list, current_command, host, port):
     for peer in SEEDS:
         # Disable pinging to self
         if peer == (host, port): continue
@@ -245,7 +244,6 @@ def verify_seeds(SEEDS,global_peer_list,current_command,host, port):
 if __name__ == '__main__':
     port=int(sys.argv[1])
 
-    
     if len(sys.argv) > 2:
         additional_seed = sys.argv[2].split(':')
         additional_seed = (additional_seed[0], int(additional_seed[1]))
