@@ -6,6 +6,9 @@ import queue
 import sys
 import random
 
+MAX_PEERS = 999
+REDISCOVER_PROB = .10
+
 METHOD_DISCOVER      = 'DSCVR'
 METHOD_PING          = 'PING'
 METHOD_INIT_REPORT   = 'INIT_REPORT'
@@ -180,6 +183,32 @@ def listen_thread(my_address, write_queue):
         except Exception as e:
             raise e
 
+def discover_peers(peer, my_addr):
+
+    global global_peer_list
+
+    ok, last_command, discovered_peers = send_discover(peer, my_addr)
+
+    if not ok:
+        return
+
+    print('Discovered:', discovered_peers)
+
+    for s in discovered_peers:
+        if s == '': continue
+        h, p = s.split(':')
+        new_peer = (h, int(p))
+
+        if new_peer not in global_peer_list:
+            if len(global_peer_list) < MAX_PEERS:
+                global_peer_list.append(new_peer)
+            elif random.random() < 0.5:
+                position_replaced = random.randint(0, len(global_peer_list) - 1)
+                print(f'Replacing peer{global_peer_list[position_replaced]} with {new_peer}')
+                global_peer_list[random.randint(0, len(global_peer_list) - 1)] = new_peer
+
+    current_command = last_command
+
 def boot_server(host='', port=2000):
 
     SEEDS = INIT_SEEDS
@@ -196,14 +225,24 @@ def boot_server(host='', port=2000):
     global current_command
     current_command = COMMAND_NOOP
 
-    verify_seeds(SEEDS, global_peer_list, current_command, get_ip(), port)
+    for peer in SEEDS:
+        # Disable pinging to self
+        if peer == (host, port): continue
+
+        global_peer_list.append(peer) # Add peer to list
+        discover_peers(peer, (host, port)) # And discover its neighboors
 
     while True:
         for peer in global_peer_list:
-            is_alive = send_ping(peer)
-            if not is_alive:
-                global_peer_list.remove(peer)
-                print('Removing', peer, 'from list')
+            if random.random() > REDISCOVER_PROB:
+                # Just ping
+                is_alive = send_ping(peer)
+                if not is_alive:
+                    global_peer_list.remove(peer)
+                    print('Removing', peer, 'from list')
+            else:
+                # Rediscover
+                discover_peers(peer, (host, port))
 
         # Read new peers from queue
         try:
@@ -214,33 +253,15 @@ def boot_server(host='', port=2000):
         except queue.Empty as e:
             pass
         print('[CURRENT_PEERS]', global_peer_list)
-        time.sleep(5)
+        time.sleep(15)
         if not global_peer_list:
             time.sleep(5)
-            print("re-initialize")
-            verify_seeds(SEEDS, global_peer_list, current_command, get_ip(), port)
+            print("Reinitializing peer list")
+            for peer in SEEDS:
+                # Disable pinging to self
+                if peer == (host, port): continue
 
-def verify_seeds(SEEDS, global_peer_list, current_command, host, port):
-    for peer in SEEDS:
-        # Disable pinging to self
-        if peer == (host, port): continue
-
-        ok, last_command, discovered_peers = send_discover(peer, (host, port))
-
-        if not ok:
-            continue
-
-        global_peer_list.append(peer)
-        print(discovered_peers)
-        for s in discovered_peers:
-            if s == '': continue
-            h, p = s.split(':')
-            new_peer = (h, int(p))
-            if new_peer not in global_peer_list:
-                global_peer_list.append(new_peer)
-
-        current_command = last_command
-
+                discover_peers(peer, (host, port)) # Discover neighboors
 if __name__ == '__main__':
     port=int(sys.argv[1])
 
@@ -251,4 +272,5 @@ if __name__ == '__main__':
 
     ip = get_ip()
     print('Initialize hosname: ', socket.gethostname(),' at address:',ip,':',port,'on:',datetime.datetime.now())
+    #print(ip, port)
     boot_server(ip,port)

@@ -11,15 +11,30 @@ INPUT_REPORT = 'report'
 INPUT_ATTACK = 'attack'
 INPUT_EXIT   = 'exit'
 
-def do_report(addr):
+def do_report(addr, to_print=True):
     report = send_init_report_listener(addr)
     report = report.replace(' ', '\n')
     lines = report.split('\n')
+    if not to_print: return lines
     for line in lines:
         ip, port, peers = line.split('|')
         print(f'{ip}:{port} ->')
         for peer in peers.split(','):
             print(f'\t{peer}')
+    return lines
+
+def do_report_graphic(addr):
+    from graphviz import Graph
+    lines = do_report(addr)
+    graph = Graph()
+    for line in lines:
+        host, port, peers_s = line.split('|')
+        src = f'{host}:{port}'
+        for dst in peers_s.split(','):
+            graph.edge(src, dst)
+    return graph
+
+
 
 def do_attack(addr):
     pass
