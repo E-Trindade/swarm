@@ -1,0 +1,14 @@
+version: '3'
+services:
+  root:
+    build: .
+    networks:
+      - my_net
+  nodes:
+    build: .
+    networks:
+      - my_net
+
+networks:
+  my_net:
+    
